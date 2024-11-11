@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	  <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\thriving.geometry\Thriving.Geometry\Thriving.Geometry.csproj" />
+    <ProjectReference Include="..\..\thriving.opencv\Thriving.OpenCV.Proxy\Thriving.OpenCV.Proxy.csproj" />
+    <ProjectReference Include="..\..\thriving.win32tools\Thriving.Win32Tools\Thriving.Win32Tools.csproj" />
+  </ItemGroup>
+
+</Project>

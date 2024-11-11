@@ -1,0 +1,32 @@
+﻿<Window
+    x:Class="Thriving.OpenGL.Demo.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:Thriving.OpenGL.Demo"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="MainWindow"
+    Width="800"
+    Height="450"
+    mc:Ignorable="d">
+    <DockPanel>
+        <StackPanel
+            Height="30"
+            DockPanel.Dock="Top"
+            Orientation="Horizontal">
+            <ToggleButton
+                x:Name="polygon_mode"
+                Margin="5"
+                Content="线框" />
+            <ToggleButton
+                x:Name="color_mode"
+                Margin="5"
+                Content="颜色模式" />
+            <ToggleButton
+                x:Name="shader_mode"
+                Margin="5"
+                Content="着色模式" />
+        </StackPanel>
+        <local:GLControl x:Name="gl" PolygonMode="{Binding ElementName=polygon_mode, Path=IsChecked}" />
+    </DockPanel>
+</Window>

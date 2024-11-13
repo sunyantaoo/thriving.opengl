@@ -45,13 +45,13 @@ namespace Thriving.OpenGL
 
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Explicit)]
     public struct Vertex
     {
-        private Point3D _position;
-        private Vector3D _normal;
-        private Vector2D _uv;
-        private Vector3D _color;
+        [FieldOffset(0)] internal Point3D _position;
+        [FieldOffset(24)] internal Vector3D _normal;
+        [FieldOffset(48)] internal Vector2D _uv;
+        [FieldOffset(64)] internal Vector3D _color;
 
         public Point3D Position
         {
@@ -84,28 +84,26 @@ namespace Thriving.OpenGL
         /// 顶点数组
         /// </summary>
         private readonly uint[] _vaos;
-        /// <summary>
-        /// 顶点缓存
-        /// </summary>
-        private readonly uint[] _vbos;
-        /// <summary>
-        /// 索引缓存
-        /// </summary>
-        private readonly uint[] _ebos;
-
         public GeometryObject()
         {
             _vaos = GL.GenVertexArrays(1);
-            _vbos = GL.GenBuffers(1);
-            _ebos = GL.GenBuffers(1);
         }
 
         ~GeometryObject()
         {
-            GL.DeleteVertexArrays(1, _vaos);
-            GL.DeleteBuffers(1, _vbos);
-            GL.DeleteBuffers(1, _ebos);
+            GL.DeleteVertexArrays(_vaos);
+            if (_vbos != null) GL.DeleteBuffers(_vbos);
+            if (_ebos != null) GL.DeleteBuffers(_ebos);
         }
+
+        /// <summary>
+        /// 顶点缓存
+        /// </summary>
+        private uint[]? _vbos;
+        /// <summary>
+        /// 索引缓存
+        /// </summary>
+        private uint[]? _ebos;
 
         public uint Id { get => _vaos[0]; }
 
@@ -116,25 +114,25 @@ namespace Thriving.OpenGL
         public unsafe void SetupVertexBuffer(Vertex[] vertices)
         {
             GL.BindVertexArray(_vaos);
-            fixed (Vertex* vPtr = vertices) 
             {
+                _vbos = GL.GenBuffers(1);
                 GL.BindBuffer(BufferType.GL_ARRAY_BUFFER, _vbos[0]);
-                GL.BufferData(BufferType.GL_ARRAY_BUFFER, vertices.Length * Marshal.SizeOf<Vertex>(), new IntPtr(vPtr), BufferUsage.GL_STATIC_DRAW);
+                GL.BufferData(BufferType.GL_ARRAY_BUFFER, vertices, BufferUsage.GL_STATIC_DRAW);
 
                 //顶点着色器position属性 layout (location = 0)
-                GL.VertexAttribPointer(0, 3, DataType.GL_DOUBLE, false,  Marshal.SizeOf<Vertex>(), (void*)0);
+                GL.VertexAttribPointer(0, 3, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), 0);
                 GL.EnableVertexAttribArray(0);
 
                 // 顶点着色器normal属性 layout (location = 1)
-                GL.VertexAttribPointer(1, 3, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), (void*)(3 * Marshal.SizeOf<double>()));
+                GL.VertexAttribPointer(1, 3, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), (Marshal.OffsetOf<Vertex>(nameof(Vertex._normal)).ToInt32()));
                 GL.EnableVertexAttribArray(1);
 
                 // 顶点着色器uv属性 layout (location = 2)
-                GL.VertexAttribPointer(2, 2, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), (void*)(6 * Marshal.SizeOf<double>()));
+                GL.VertexAttribPointer(2, 2, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), (Marshal.OffsetOf<Vertex>(nameof(Vertex._uv)).ToInt32()));
                 GL.EnableVertexAttribArray(2);
 
                 // 顶点着色器color属性 layout (location = 3)
-                GL.VertexAttribPointer(3, 3, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), (void*)(8 * Marshal.SizeOf<double>()));
+                GL.VertexAttribPointer(3, 3, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), (Marshal.OffsetOf<Vertex>(nameof(Vertex._color)).ToInt32()));
                 GL.EnableVertexAttribArray(3);
             }
             GL.BindVertexArray(Array.Empty<uint>());
@@ -147,21 +145,26 @@ namespace Thriving.OpenGL
         public unsafe void SetupIndexBuffer(uint[] indices)
         {
             GL.BindVertexArray(_vaos);
-            fixed (uint* iPtr = indices)
             {
+                _ebos = GL.GenBuffers(1);
                 GL.BindBuffer(BufferType.GL_ELEMENT_ARRAY_BUFFER, _ebos[0]);
-                GL.BufferData(BufferType.GL_ELEMENT_ARRAY_BUFFER, indices.Length * Marshal.SizeOf<uint>(), new IntPtr( iPtr), BufferUsage.GL_STATIC_DRAW);
+                GL.BufferData(BufferType.GL_ELEMENT_ARRAY_BUFFER, indices, BufferUsage.GL_STATIC_DRAW);
             }
             GL.BindVertexArray(Array.Empty<uint>());
         }
 
-        /// <summary>
-        /// 绑定图形对象，指示GPU的相关后续操作读取的是该对象关联的缓存对象
-        /// </summary>
-        public void Bind()
+
+        internal void Draw()
         {
             GL.BindVertexArray(_vaos);
+            {
+                // 根据图形的不同特性绘制
+                GL.DrawArrays(DrawMode.GL_TRIANGLES, 0, 36);
+                //GL.DrawElements(DrawMode.GL_TRIANGLES, 6, indices);
+            }
+            GL.BindVertexArray(Array.Empty<uint>());
         }
+
     }
 
     /// <summary>

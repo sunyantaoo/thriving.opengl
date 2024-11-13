@@ -31,20 +31,35 @@ namespace Thriving.OpenGL
         /// </summary>
         public Color SpecularColor { get; set; }
 
+        /// <summary>
+        /// 配置shader光源参数
+        /// </summary>
+        /// <param name="shader"></param>
+        public abstract void Configure(Shader shader);
+
     }
 
-    public class PointLight: LightBase
+    public class PointLight : LightBase
     {
-
+        public override void Configure(Shader shader)
+        {
+            throw new NotImplementedException();
+        }
     }
 
-    public class SpotLight : LightBase 
+    public class SpotLight : LightBase
     {
-
+        public override void Configure(Shader shader)
+        {
+            throw new NotImplementedException();
+        }
     }
 
-    public class DirectionalLight : LightBase 
-    { 
-
+    public class DirectionalLight : LightBase
+    {
+        public override void Configure(Shader shader)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

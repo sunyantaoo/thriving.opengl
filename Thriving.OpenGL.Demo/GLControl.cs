@@ -1,6 +1,5 @@
 ﻿using System.Runtime.InteropServices;
 using System.Windows.Interop;
-using Thriving.OpenGL;
 using Thriving.Geometry;
 using Thriving.Win32Tools;
 using System.Diagnostics;
@@ -23,7 +22,7 @@ namespace Thriving.OpenGL.Demo
         /// GL Render Context
         /// </summary>
         private IntPtr _hglrc;
-
+      
         public bool PolygonMode
         {
             get { return (bool)GetValue(PolygonModeProperty); }
@@ -32,11 +31,42 @@ namespace Thriving.OpenGL.Demo
         public static readonly DependencyProperty PolygonModeProperty =
             DependencyProperty.Register("PolygonMode", typeof(bool), typeof(GLControl), new PropertyMetadata(false, OnPropertyChanged));
 
-        public static void OnPropertyChanged(DependencyObject obj, DependencyPropertyChangedEventArgs e)
-        {
-            (obj as GLControl)?.Refresh();
-        }
 
+        public string VertexShaderSource
+        {
+            get { return (string)GetValue(VertexShaderSourceProperty); }
+            set { SetValue(VertexShaderSourceProperty, value); }
+        }
+        public static readonly DependencyProperty VertexShaderSourceProperty =
+            DependencyProperty.Register("VertexShaderSource", typeof(string), typeof(GLControl), new PropertyMetadata(vertexShaderSource,OnPropertyChanged));
+
+        public string FragmentShaderSource
+        {
+            get { return (string)GetValue(FragmentShaderSourceProperty); }
+            set { SetValue(FragmentShaderSourceProperty, value); }
+        }
+        public static readonly DependencyProperty FragmentShaderSourceProperty =
+            DependencyProperty.Register("FragmentShaderSource", typeof(string), typeof(GLControl), new PropertyMetadata(fragmentShaderSource,OnPropertyChanged));
+
+        public string GeometryShaderSource
+        {
+            get { return (string)GetValue(GeometryShaderSourceProperty); }
+            set { SetValue(GeometryShaderSourceProperty, value); }
+        }
+        public static readonly DependencyProperty GeometryShaderSourceProperty =
+            DependencyProperty.Register("GeometryShaderSource", typeof(string), typeof(GLControl), new PropertyMetadata(string.Empty, OnPropertyChanged));
+
+        private static void OnPropertyChanged(DependencyObject obj, DependencyPropertyChangedEventArgs e)
+        {
+            if (obj is GLControl ctl)
+            {
+                if (e.Property == VertexShaderSourceProperty || e.Property == FragmentShaderSourceProperty)
+                {
+                    ctl.ComplierShader();
+                }
+                ctl.Refresh();
+            }
+        }
 
         public GLControl()
         {
@@ -57,13 +87,13 @@ namespace Thriving.OpenGL.Demo
             {
                 if (HwndSource.FromVisual(this) is HwndSource hwndParent)
                 {
-                    var p1 = this.PointToScreen(new Point(this.VisualOffset.X, this.VisualOffset.Y));
+                    var p1 = this.PointToScreen((Point)this.VisualOffset);
                     var p0 = this.PointFromScreen(p1);
 
                     _hwnd = WindowHelper.CreateWindowEx(0, _className, "View",
                         Thriving.Win32Tools.WindowStyle.WS_CHILD | Thriving.Win32Tools.WindowStyle.WS_VISIBLE,
                          (int)p0.X, (int)p0.Y,
-                        (int)this.ActualWidth, (int)this.ActualHeight,
+                       (int)this.ActualWidth, (int)this.ActualHeight,
                         hwndParent.Handle,
                         IntPtr.Zero,
                         _hInstance,
@@ -75,7 +105,7 @@ namespace Thriving.OpenGL.Demo
             {
                 if (_hwnd != IntPtr.Zero)
                 {
-                    var p1 = this.PointToScreen(new Point(this.VisualOffset.X, this.VisualOffset.Y));
+                    var p1 = this.PointToScreen((Point)this.VisualOffset);
                     var p0 = this.PointFromScreen(p1);
                     WindowHelper.SetWindowPos(_hwnd, IntPtr.Zero, (int)p0.X, (int)p0.Y, (int)e.NewSize.Width, (int)e.NewSize.Height, WindowPosStyle.SWP_SHOWWINDOW);
                 }
@@ -93,14 +123,22 @@ namespace Thriving.OpenGL.Demo
             }
         }
 
-        protected void Refresh()
+
+        private void Refresh()
         {
-            if (_hwnd != IntPtr.Zero) 
-            {
-                WindowHelper.SendMessage(_hwnd, WindowMessage.WM_PAINT, IntPtr.Zero, IntPtr.Zero);
-            }
+            if (_hwnd == IntPtr.Zero) return;
+            WindowHelper.SendMessage(_hwnd, WindowMessage.WM_PAINT, IntPtr.Zero, IntPtr.Zero);
         }
 
+        private void ComplierShader()
+        {
+            if (_shader == null) return;
+            if (!string.IsNullOrEmpty(VertexShaderSource)) _shader.Complie(VertexShaderSource, ShaderType.GL_VERTEX_SHADER);
+            if (!string.IsNullOrEmpty(GeometryShaderSource)) _shader.Complie(GeometryShaderSource, ShaderType.GL_GEOMETRY_SHADER);
+            if (!string.IsNullOrEmpty(FragmentShaderSource)) _shader.Complie(fragmentShaderSource, ShaderType.GL_FRAGMENT_SHADER);
+            _shader.Link();
+            _shader.Use();
+        }
 
         private const string vertexShaderSource = "#version 330 core\r\n" +
            "layout (location = 0) in vec3 aPos;\r\n" +
@@ -129,7 +167,8 @@ namespace Thriving.OpenGL.Demo
         protected CameraBase _camera;
         protected Texture _texture1;
         protected Texture _texture2;
-        protected GeometryObject _geo;
+
+        protected GeometryEntity _entity;
 
         private bool _firstMouse = true;
         private short _lastX;
@@ -236,9 +275,13 @@ namespace Thriving.OpenGL.Demo
                         1, 2, 3
                     };
 
-                _geo = new GeometryObject();
-                _geo.SetupVertexBuffer(vertices);
-                _geo.SetupIndexBuffer(indices);
+                var geo = new GeometryObject();
+                geo.SetupVertexBuffer(vertices);
+                geo.SetupIndexBuffer(indices);
+
+                var material = new BasicMaterial();
+
+                _entity = new GeometryEntity(geo, material);
 
                 _texture1 = new Texture(TextureTarget.GL_TEXTURE_2D);
                 _texture1.BindImage2D(@"C:\Users\Master\Desktop\PixPin_2024-07-26_23-41-47.jpg");
@@ -283,35 +326,9 @@ namespace Thriving.OpenGL.Demo
                 _texture1.Bind();
                 GL.ActiveTexture(TextureLayer.GL_TEXTURE1);
                 _texture2.Bind();
-                _shader.Use();
 
-                 var modelTrans = Transform3D.CreateRotation(Vector3D.BasisY, DateTime.Now.Millisecond * Math.PI / 999);
-               // var modelTrans = Transform3D.Identity;
-                var tArray1 = new float[]
-                {
-                            (float)modelTrans.BasisX.X,  (float)modelTrans.BasisY.X,  (float)modelTrans.BasisZ.X,  (float)modelTrans.Origin.X,
-                            (float)modelTrans.BasisX.Y,  (float)modelTrans.BasisY.Y,  (float)modelTrans.BasisZ.Y  ,(float)modelTrans.Origin.Y,
-                            (float)modelTrans.BasisX.Z,  (float)modelTrans.BasisY.Z, (float)modelTrans.BasisZ.Z  ,(float)modelTrans.Origin.Z,
-                            (float)0,  (float)0, (float)0  ,(float)1,
-                };
-
-
-                var tArray3 = _camera.GetProjectionMatrix();
-
-                var location1 = GL.GetUniformLocation(_shader.Id, "model");
-                GL.UniformMatrix4fv(location1, 1, true, tArray1);
-
-                var location3 = GL.GetUniformLocation(_shader.Id, "projection");
-                GL.UniformMatrix4fv(location3, 1, false, tArray3);
-
-                var indices = new uint[] {
-                        0, 1, 3,
-                        1, 2, 3
-                    };
-
-                _geo.Bind();
-                GL.DrawArrays(DrawMode.GL_TRIANGLES, 0, 36);
-                //GL.DrawElements(DrawMode.GL_TRIANGLES, 6, indices);
+                _entity.Rotate(Vector3D.BasisY, (float)(DateTime.Now.Millisecond * Math.PI / 999));
+                _entity.Draw(_shader, _camera);
 
                 GL.SwapBuffers(_hdc);
             }
@@ -335,7 +352,6 @@ namespace Thriving.OpenGL.Demo
                         orth.top = 0.5 * ActualHeight;
                         orth.bottom = -0.5 * ActualHeight;
                     }
-
                 }
             }
 
@@ -352,14 +368,13 @@ namespace Thriving.OpenGL.Demo
                 }
                 if (key == VirtualKeyCode.VK_LEFT)
                 {
-                  
                     _camera.Position = _camera.Position.Subtract(0.1 * _camera.Right);
                 }
                 if (key == VirtualKeyCode.VK_RIGHT)
                 {
                     _camera.Position = _camera.Position.Add(0.1 * _camera.Right);
                 }
-                WindowHelper.SendMessage(_hwnd, WindowMessage.WM_PAINT, IntPtr.Zero, IntPtr.Zero);
+                Refresh();
             }
 
             if (msg == WindowMessage.WM_MOUSEWHEEL)
@@ -370,7 +385,7 @@ namespace Thriving.OpenGL.Demo
                 {
                     _camera.Position = _camera.Position.Add((offset / 120) * _camera.LookAt);
                 }
-                WindowHelper.SendMessage(_hwnd, WindowMessage.WM_PAINT, IntPtr.Zero, IntPtr.Zero);
+                Refresh();
             }
 
 
@@ -400,7 +415,7 @@ namespace Thriving.OpenGL.Demo
                         {
                             _camera.Pitch(Math.PI * yoffset / 1800);
                         }
-                        WindowHelper.SendMessage(_hwnd, WindowMessage.WM_PAINT, IntPtr.Zero, IntPtr.Zero);
+                        Refresh();
                     }
                     _lastX = xPos;
                     _lastY = yPos;
@@ -412,7 +427,5 @@ namespace Thriving.OpenGL.Demo
             }
             return WindowHelper.DefWindowProc(hwnd, msg, wParam, lParam);
         }
-
-
     }
 }

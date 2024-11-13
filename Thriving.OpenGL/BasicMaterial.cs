@@ -47,5 +47,18 @@ namespace Thriving.OpenGL
         ///  物体光泽度，即镜面反射指数
         /// </summary>
         public float Shininess { get; set; }
+
+        /// <summary>
+        /// 配置shader材质参数
+        /// </summary>
+        /// <param name="shader"></param>
+        public void Configure(Shader shader)
+        {
+
+
+
+
+
+        }
     }
 }

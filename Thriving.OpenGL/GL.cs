@@ -1,4 +1,6 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Drawing;
+using System.Runtime.InteropServices;
 using Thriving.Win32Tools;
 
 namespace Thriving.OpenGL
@@ -212,10 +214,10 @@ namespace Thriving.OpenGL
         }
 
         private delegate void glDeleteVertexArrays(int n, uint[] array);
-        public static void DeleteVertexArrays(int n, uint[] array)
+        public static void DeleteVertexArrays(uint[] array)
         {
             var func = GetProcAddress<glDeleteVertexArrays>();
-            func?.Invoke(n, array);
+            func?.Invoke(array.Length, array);
         }
 
         private delegate void glGenBuffers(int n, uint[] array);
@@ -228,10 +230,10 @@ namespace Thriving.OpenGL
         }
 
         private delegate void glDeleteBuffers(int n, uint[] array);
-        public static void DeleteBuffers(int n, uint[] array)
+        public static void DeleteBuffers(uint[] array)
         {
             var func = GetProcAddress<glDeleteBuffers>();
-            func?.Invoke(n, array);
+            func?.Invoke(array.Length, array);
         }
 
         private delegate void glBindVertexArray(uint[] array);
@@ -248,18 +250,41 @@ namespace Thriving.OpenGL
             func?.Invoke(bufferType, buffer);
         }
 
-        private delegate void glBufferData(BufferType bufferType, long size, IntPtr data, BufferUsage usage);
-        public static void BufferData(BufferType bufferType, long size, IntPtr data, BufferUsage usage)
+        private delegate void glBufferData(BufferType bufferType, long size, void* data, BufferUsage usage);
+        public static void BufferData<T>(BufferType bufferType, T[] data, BufferUsage usage) where T : struct
         {
             var func = GetProcAddress<glBufferData>();
-            func?.Invoke(bufferType, size, data, usage);
+            if (func == null) return;
+            long size = data.Length * Marshal.SizeOf<T>();
+            fixed (T* ptr = data)
+            {
+                func.Invoke(bufferType, size, ptr, usage);
+            }
         }
 
-        private delegate void glVertexAttribPointer(int index, int size, DataType type, bool normalized, int stride, void* pointer);
-        public static void VertexAttribPointer(int index, int size, DataType type, bool normalized, int stride, void* pointer)
+        private delegate void glVertexAttribPointer(int index, int size, DataType type, bool normalized, int stride, int offset);
+        public static void VertexAttribPointer(int index, int size, DataType type, bool normalized, int stride, int offset)
         {
             var func = GetProcAddress<glVertexAttribPointer>();
-            func?.Invoke(index, size, type, normalized, stride, pointer);
+            func?.Invoke(index, size, type, normalized, stride, offset);
+        }
+
+
+
+        private delegate int glGetAttribLocation(uint shaderId, string name);
+
+        public static int GetAttribLocation(uint shaderId, string name)
+        {
+            var func = GetProcAddress<glGetAttribLocation>();
+            if (func != null) return func.Invoke(shaderId, name);
+            return -1;
+        }
+
+        private delegate void glBindAttribLocation(uint shaderId, uint index, [MarshalAs(UnmanagedType.LPStr)] string name);
+        public static void BindAttribLocation(uint shaderId, uint index, string name)
+        {
+            var func = GetProcAddress<glBindAttribLocation>();
+            func?.Invoke(shaderId, index, name);
         }
 
         private delegate void glEnableVertexAttribArray(int index);
@@ -267,6 +292,212 @@ namespace Thriving.OpenGL
         {
             var func = GetProcAddress<glEnableVertexAttribArray>();
             func?.Invoke(index);
+        }
+
+        private delegate void glVertexAttrib1f(uint index, float v0);
+        private delegate void glVertexAttrib1s(uint index, short v0);
+        private delegate void glVertexAttrib1d(uint index, double v0);
+        private delegate void glVertexAttribI1i(uint index, int v0);
+        private delegate void glVertexAttribI1ui(uint index, uint v0);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T">[<see cref="byte"/>,<see cref="short"/>,<see cref="int"/>,<see cref="uint"/>,<see cref="float"/>,<see cref="double"/>]</typeparam>
+        /// <param name="index"></param>
+        /// <param name="v"></param>
+        public static void VertexAttribute<T>(uint index, T v) where T : struct
+        {
+            Delegate? func = null;
+            if (typeof(T) == typeof(float)) func = GetProcAddress<glVertexAttrib1f>();
+            if (typeof(T) == typeof(short)) func = GetProcAddress<glVertexAttrib1s>();
+            if (typeof(T) == typeof(double)) func = GetProcAddress<glVertexAttrib1d>();
+            if (typeof(T) == typeof(int)) func = GetProcAddress<glVertexAttribI1i>();
+            if (typeof(T) == typeof(uint)) func = GetProcAddress<glVertexAttribI1ui>();
+
+            func?.DynamicInvoke(index, v);
+        }
+
+        private delegate void glVertexAttrib2f(uint index, float v0, float v1);
+        private delegate void glVertexAttrib2s(uint index, short v0, short v1);
+        private delegate void glVertexAttrib2d(uint index, double v0, double v1);
+        private delegate void glVertexAttribI2i(uint index, int v0, int v1);
+        private delegate void glVertexAttribI2ui(uint index, uint v0, uint v1);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T">[<see cref="short"/>,<see cref="int"/>,<see cref="uint"/>,<see cref="float"/>,<see cref="double"/>]</typeparam>
+        /// <param name="index"></param>
+        /// <param name="v0"></param>
+        /// <param name="v1"></param>
+        public static void VertexAttribute<T>(uint index, T v0,T v1) where T : struct
+        {
+            Delegate? func = null;
+            if (typeof(T) == typeof(float)) func = GetProcAddress<glVertexAttrib2f>();
+            if (typeof(T) == typeof(short)) func = GetProcAddress<glVertexAttrib2s>();
+            if (typeof(T) == typeof(double)) func = GetProcAddress<glVertexAttrib2d>();
+            if (typeof(T) == typeof(int)) func = GetProcAddress<glVertexAttribI2i>();
+            if (typeof(T) == typeof(uint)) func = GetProcAddress<glVertexAttribI2ui>();
+
+            func?.DynamicInvoke(index, v0, v1);
+        }
+
+        private delegate void glVertexAttrib3f(uint index, float v0, float v1, float v2);
+        private delegate void glVertexAttrib3s(uint index, short v0, short v1, short v2);
+        private delegate void glVertexAttrib3d(uint index, double v0, double v1, double v2);
+        private delegate void glVertexAttribI3i(uint index, int v0, int v1, int v2);
+        private delegate void glVertexAttribI3ui(uint index, uint v0, uint v1, uint v2);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T">[<see cref="short"/>,<see cref="int"/>,<see cref="uint"/>,<see cref="float"/>,<see cref="double"/>]</typeparam>
+        /// <param name="index"></param>
+        /// <param name="v0"></param>
+        /// <param name="v1"></param>
+        /// <param name="v2"></param>
+        public static void VertexAttribute<T>(uint index, T v0, T v1, T v2) where T : struct
+        {
+            Delegate? func = null;
+            if (typeof(T) == typeof(float)) func = GetProcAddress<glVertexAttrib3f>();
+            if (typeof(T) == typeof(short)) func = GetProcAddress<glVertexAttrib3s>();
+            if (typeof(T) == typeof(double)) func = GetProcAddress<glVertexAttrib3d>();
+            if (typeof(T) == typeof(int)) func = GetProcAddress<glVertexAttribI3i>();
+            if (typeof(T) == typeof(uint)) func = GetProcAddress<glVertexAttribI3ui>();
+
+            func?.DynamicInvoke(index, v0, v1, v2);
+        }
+
+        private delegate void glVertexAttrib4f(uint index, float v0, float v1, float v2, float v3);
+        private delegate void glVertexAttrib4s(uint index, short v0, short v1, short v2, short v3);
+        private delegate void glVertexAttrib4d(uint index, double v0, double v1, double v2, double v3);
+        private delegate void glVertexAttrib4Nub(uint index, byte v0, byte v1, byte v2, byte v3);
+        private delegate void glVertexAttribI4i(uint index, int v0, int v1, int v2, int v3);
+        private delegate void glVertexAttribI4ui(uint index, uint v0, uint v1, uint v2, uint v3);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T">[<see cref="byte"/>,<see cref="short"/>,<see cref="int"/>,<see cref="uint"/>,<see cref="float"/>,<see cref="double"/>] </typeparam>
+        /// <param name="index"></param>
+        /// <param name="v0"></param>
+        /// <param name="v1"></param>
+        /// <param name="v2"></param>
+        /// <param name="v3"></param>
+        public static void VertexAttribute<T>(uint index, T v0, T v1, T v2, T v3) where T : struct
+        {
+            Delegate? func = null;
+            if (typeof(T) == typeof(float)) func = GetProcAddress<glVertexAttrib4f>();
+            if (typeof(T) == typeof(short)) func = GetProcAddress<glVertexAttrib4s>();
+            if (typeof(T) == typeof(double)) func = GetProcAddress<glVertexAttrib4d>();
+            if (typeof(T) == typeof(int)) func = GetProcAddress<glVertexAttribI4i>();
+            if (typeof(T) == typeof(uint)) func = GetProcAddress<glVertexAttribI4ui>();
+            if (typeof(T) == typeof(byte)) func = GetProcAddress<glVertexAttrib4Nub>();
+
+            func?.DynamicInvoke(index, v0, v1, v2, v3);
+        }
+
+        private delegate void glVertexAttribL1d(uint index, double v0);
+        private delegate void glVertexAttribL2d(uint index, double v0, double v1);
+        private delegate void glVertexAttribL3d(uint index, double v0, double v1, double v2);
+        private delegate void glVertexAttribL4d(uint index, double v0, double v1, double v2, double v3);
+        
+        private delegate void glVertexAttrib1fv(uint index, float[] v);
+        private delegate void glVertexAttrib1sv(uint index, short[] v);
+        private delegate void glVertexAttrib1dv(uint index, double[] v);
+        private delegate void glVertexAttribI1iv(uint index, int[] v);
+        private delegate void glVertexAttribI1uiv(uint index, uint[] v);
+
+        private delegate void glVertexAttrib2fv(uint index, float[] v);
+        private delegate void glVertexAttrib2sv(uint index, short[] v);
+        private delegate void glVertexAttrib2dv(uint index, double[] v);
+        private delegate void glVertexAttribI2iv(uint index, int[] v);
+        private delegate void glVertexAttribI2uiv(uint index, uint[] v);
+
+        private delegate void glVertexAttrib3fv(uint index, float[] v);
+        private delegate void glVertexAttrib3sv(uint index, short[] v);
+        private delegate void glVertexAttrib3dv(uint index, double[] v);
+        private delegate void glVertexAttribI3iv(uint index, int[] v);
+        private delegate void glVertexAttribI3uiv(uint index, uint[] v);
+
+        private delegate void glVertexAttrib4fv(uint index, float[] v);
+        private delegate void glVertexAttrib4sv(uint index, short[] v);
+        private delegate void glVertexAttrib4dv(uint index, double[] v);
+        private delegate void glVertexAttrib4iv(uint index, int[] v);
+        private delegate void glVertexAttrib4uiv(uint index, uint[] v);
+
+        private delegate void glVertexAttrib4bv(uint index, sbyte[] v);
+        private delegate void glVertexAttrib4ubv(uint index, byte[] v);
+        private delegate void glVertexAttrib4usv(uint index, ushort[] v);
+        private delegate void glVertexAttrib4Nbv(uint index, sbyte[] v);
+        private delegate void glVertexAttrib4Nsv(uint index, short[] v);
+        private delegate void glVertexAttrib4Niv(uint index, int[] v);
+        private delegate void glVertexAttrib4Nubv(uint index, byte[] v);
+        private delegate void glVertexAttrib4Nusv(uint index, ushort[] v);
+        private delegate void glVertexAttrib4Nuiv(uint index, uint[] v);
+        private delegate void glVertexAttribI4bv(uint index, sbyte[] v);
+        private delegate void glVertexAttribI4ubv(uint index, byte[] v);
+        private delegate void glVertexAttribI4sv(uint index, short[] v);
+        private delegate void glVertexAttribI4usv(uint index, ushort[] v);
+        private delegate void glVertexAttribI4iv(uint index, int[] v);
+        private delegate void glVertexAttribI4uiv(uint index, uint[] v);
+
+        private delegate void glVertexAttribL1dv(uint index, double[] v);
+        private delegate void glVertexAttribL2dv(uint index, double[] v);
+        private delegate void glVertexAttribL3dv(uint index, double[] v);
+        private delegate void glVertexAttribL4dv(uint index, double[] v);
+        private delegate void glVertexAttribP1ui(uint index, DataType type, bool normalized, uint value);
+        private delegate void glVertexAttribP2ui(uint index, DataType type, bool normalized, uint value);
+        private delegate void glVertexAttribP3ui(uint index, DataType type, bool normalized, uint value);
+        private delegate void glVertexAttribP4ui(uint index, DataType type, bool normalized, uint value);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T">[<see cref="short"/>,<see cref="int"/>,<see cref="uint"/>,<see cref="float"/>,<see cref="double"/>]</typeparam>
+        /// <param name="index"></param>
+        /// <param name="v"></param>
+        public static void VertexAttribute<T>(uint index, T[] v) where T : struct
+        {
+            Delegate? func = null;
+            if (typeof(T) == typeof(short))
+            {
+                if (v.Length == 1) { func = GetProcAddress<glVertexAttrib1sv>(); }
+                if (v.Length == 2) { func = GetProcAddress<glVertexAttrib2sv>(); }
+                if (v.Length == 3) { func = GetProcAddress<glVertexAttrib3sv>(); }
+                if (v.Length == 4) { func = GetProcAddress<glVertexAttrib4sv>(); }
+            }
+            if (typeof(T) == typeof(int))
+            {
+                if (v.Length == 1) { func = GetProcAddress<glVertexAttribI1iv>(); }
+                if (v.Length == 2) { func = GetProcAddress<glVertexAttribI2iv>(); }
+                if (v.Length == 3) { func = GetProcAddress<glVertexAttribI3iv>(); }
+                if (v.Length == 4) { func = GetProcAddress<glVertexAttribI4iv>(); }
+            }
+            if (typeof(T) == typeof(uint))
+            {
+                if (v.Length == 1) { func = GetProcAddress<glVertexAttribI1uiv>(); }
+                if (v.Length == 2) { func = GetProcAddress<glVertexAttribI2uiv>(); }
+                if (v.Length == 3) { func = GetProcAddress<glVertexAttribI3uiv>(); }
+                if (v.Length == 4) { func = GetProcAddress<glVertexAttribI4uiv>(); }
+            }
+            if (typeof(T) == typeof(float))
+            {
+                if (v.Length == 1) { func = GetProcAddress<glVertexAttrib1fv>(); }
+                if (v.Length == 2) { func = GetProcAddress<glVertexAttrib2fv>(); }
+                if (v.Length == 3) { func = GetProcAddress<glVertexAttrib3fv>(); }
+                if (v.Length == 4) { func = GetProcAddress<glVertexAttrib4fv>(); }
+            }
+            if (typeof(T) == typeof(double))
+            {
+                if (v.Length == 1) { func = GetProcAddress<glVertexAttrib1dv>(); }
+                if (v.Length == 2) { func = GetProcAddress<glVertexAttrib2dv>(); }
+                if (v.Length == 3) { func = GetProcAddress<glVertexAttrib3dv>(); }
+                if (v.Length == 4) { func = GetProcAddress<glVertexAttrib4dv>(); }
+            }
+
+            func?.DynamicInvoke(index, v);
         }
 
         private delegate uint glCreateShader(ShaderType shaderType);
@@ -277,11 +508,11 @@ namespace Thriving.OpenGL
             return result;
         }
 
-        private delegate int glShaderSource(uint shader, int count, string[] src, int* length);
+        private delegate int glShaderSource(uint shader, int count, string[] src, int[] length);
         public static void ShaderSource(uint shader, int count, string[] src, int[] length)
         {
             var func = GetProcAddress<glShaderSource>();
-            func?.Invoke(shader, count, src, null);
+            func?.Invoke(shader, count, src, length);
         }
 
         private delegate int glCompileShader(uint shader);
@@ -334,40 +565,43 @@ namespace Thriving.OpenGL
             func?.Invoke(shader);
         }
 
-        private delegate void glGetShaderiv(uint shader, ShaderInfo pName, int* param);
+        private delegate void glGetShaderiv(uint shader, ShaderInfo pName, out int param);
         public static int GetShaderiv(uint shader, ShaderInfo pName)
         {
             var func = GetProcAddress<glGetShaderiv>();
             int result = 0;
-            func?.Invoke(shader, pName, &result);
+            func?.Invoke(shader, pName, out result);
             return result;
         }
 
-        private delegate void glGetShaderInfoLog(uint shader, int bufSize, int* length, char[] infoLog);
-        public static string GetShaderInfoLog(uint shader, int bufSize)
+        private delegate void glGetShaderInfoLog(uint shader, int bufSize, ref int length, char[] infoLog);
+        public static string GetShaderInfoLog(uint shader)
         {
+            var bufSize = GetShaderiv(shader, ShaderInfo.GL_INFO_LOG_LENGTH);
             var func = GetProcAddress<glGetShaderInfoLog>();
             var result = new char[bufSize];
-            func?.Invoke(shader, bufSize, null, result);
-            return new string(result);
+            int length = 0;
+            func?.Invoke(shader, bufSize, ref length, result);
+            return length > 0 ? new string(result) : string.Empty;
         }
 
-        private delegate void glGetProgramiv(uint program, ProgramInfo pName, int* param);
+        private delegate void glGetProgramiv(uint program, ProgramInfo pName, out int param);
         public static int GetProgramiv(uint program, ProgramInfo pName)
         {
-            int result = 0;
             var func = GetProcAddress<glGetProgramiv>();
-            func?.Invoke(program, pName, &result);
+            int result = 0;
+            func?.Invoke(program, pName, out result);
             return result;
         }
 
-        private delegate void glGetProgramInfoLog(uint program, int bufSize, int* length, char[] infoLog);
-        public static string GetProgramInfoLog(uint program, int bufSize)
+        private delegate void glGetProgramInfoLog(uint program, int bufSize, ref int length, char[] infoLog);
+        public static string GetProgramInfoLog(uint program)
         {
+            var bufSize = GetProgramiv(program, ProgramInfo.GL_INFO_LOG_LENGTH);
             var func = GetProcAddress<glGetProgramInfoLog>();
             int length = 0;
             var result = new char[bufSize];
-            func?.Invoke(program, bufSize, &length, result);
+            func?.Invoke(program, bufSize, ref length, result);
             return length > 0 ? new string(result) : string.Empty;
         }
 
@@ -375,8 +609,8 @@ namespace Thriving.OpenGL
         public static int GetUniformLocation(uint program, string param)
         {
             var func = GetProcAddress<glGetUniformLocation>();
-            var result = func != null ? func.Invoke(program, param) : 0;
-            return result;
+            if (func != null) return func.Invoke(program, param);
+            return -1;
         }
 
         private delegate void glUniform1f(int location, float v0);
@@ -750,7 +984,7 @@ namespace Thriving.OpenGL
         private static extern IntPtr wglGetCurrentContext();
 
         [DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress")]
-        private static extern IntPtr wglGetProcAddress([MarshalAs(UnmanagedType.LPStr)]string LPCSTR);
+        private static extern IntPtr wglGetProcAddress([MarshalAs(UnmanagedType.LPStr)] string LPCSTR);
     }
 
     public enum PolygonMode
@@ -764,7 +998,7 @@ namespace Thriving.OpenGL
     {
         GL_FRONT = 0x040,
         GL_BACK = 0x0405,
-        GL_FRONT_AND_BACK= 0x0408,
+        GL_FRONT_AND_BACK = 0x0408,
     }
 
 }

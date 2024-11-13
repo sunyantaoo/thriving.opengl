@@ -131,16 +131,6 @@ namespace Thriving.OpenGL
                 (float)m6[0,2],(float)m6[1,2],(float)m6[2,2],(float)m6[3,2],
                 (float)m6[0,3],(float)m6[1,3],(float)m6[2,3],(float)m6[3,3],
              };
-
-            //var tanHalfFovy = (float)Math.Tan(Math.PI * fov / 360);
-
-            //var result = new float[16];
-            //result[0] = (float)(1.0f / (aspect * tanHalfFovy));
-            //result[5] = 1.0f / (tanHalfFovy);
-            //result[10] = (float)(-(ZFar + ZNear) / (ZFar - ZNear));
-            //result[11] = -1.0f;
-            //result[14] = (float)(-(2.0f * ZFar * ZNear) / (ZFar - ZNear));
-            //result[15] = 1.0f;
             return result;
         }
     }

@@ -1,4 +1,5 @@
-﻿using Thriving.Geometry;
+﻿using System;
+using Thriving.Geometry;
 
 namespace Thriving.OpenGL
 {
@@ -9,6 +10,30 @@ namespace Thriving.OpenGL
         /// 局部坐标系
         /// </summary>
         protected Transform3D _transform = Transform3D.Identity;
+
+        public float[] GetModelMatrix(bool transpose)
+        {
+            if (transpose)
+            {
+                return new float[]
+                {
+                    (float)_transform.BasisX.X,(float)_transform.BasisX.Y,(float)_transform.BasisX.Z,0f,
+                     (float)_transform.BasisY.X, (float)_transform.BasisY.Y,(float)_transform.BasisY.Z,0f,
+                     (float)_transform.BasisZ.X, (float)_transform.BasisZ.Y, (float)_transform.BasisZ.Z,0f,
+                     (float)_transform.Origin.X,(float)_transform.Origin.Y,(float)_transform.Origin.Z,1f
+                };
+            }
+            else
+            {
+                return new float[]
+                {
+                    (float)_transform.BasisX.X,  (float)_transform.BasisY.X,  (float)_transform.BasisZ.X,  (float)_transform.Origin.X,
+                    (float)_transform.BasisX.Y,  (float)_transform.BasisY.Y,  (float)_transform.BasisZ.Y  ,(float)_transform.Origin.Y,
+                    (float)_transform.BasisX.Z,  (float)_transform.BasisY.Z, (float)_transform.BasisZ.Z  ,(float)_transform.Origin.Z,
+                    0f, 0f, 0f ,1f
+                };
+            }
+        }
 
         /// <summary>
         /// 移动
@@ -41,7 +66,7 @@ namespace Thriving.OpenGL
             _transform = _transform.Multiply(target);
         }
 
-    }
+   }
 
 
 
@@ -55,12 +80,15 @@ namespace Thriving.OpenGL
             _material = material;
         }
 
-        public void Draw()
+        public void Draw(Shader shader, CameraBase camera)
         {
-            GL.BindVertexArray(new uint[] { _geometry.Id });
+            shader.Use();
+            // 更新顶点着色器
+            shader.UpdateVertexShader(this, camera);
+            // 更新片段着色器
+            shader.UpdateFragmentShader(_material);
 
-
-            GL.BindVertexArray(Array.Empty<uint>());
+            _geometry.Draw();
         }
 
     }

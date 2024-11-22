@@ -1,6 +1,4 @@
-﻿using System;
-using System.Drawing;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Thriving.Win32Tools;
 
 namespace Thriving.OpenGL
@@ -71,6 +69,69 @@ namespace Thriving.OpenGL
             return GDIHelper.SwapBuffers(hdc);
         }
 
+        private delegate void glGetBooleanv(GLParameter pname,  IntPtr data);
+        private delegate void glGetDoublev(GLParameter pname, IntPtr data);
+        private delegate void glGetFloatv(GLParameter pname, IntPtr data);
+        private delegate void glGetIntegerv(GLParameter pname, IntPtr data);
+        private delegate void glGetInteger64v(GLParameter pname, IntPtr data);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T">[bool,int,long,float,double]</typeparam>
+        /// <param name="pname"></param>
+        /// <returns></returns>
+        public static T? Get<T>(GLParameter pname) where T : struct
+        {
+            Delegate? func = null;
+            if (typeof(T) == typeof(int)) { func = GetProcAddress<glGetIntegerv>(); }
+            if (typeof(T) == typeof(bool)) { func = GetProcAddress<glGetBooleanv>(); }
+            if (typeof(T) == typeof(float)) { func = GetProcAddress<glGetFloatv>(); }
+            if (typeof(T) == typeof(double)) { func = GetProcAddress<glGetDoublev>(); }
+            if (typeof(T) == typeof(long)) { func = GetProcAddress<glGetInteger64v>(); }
+
+            T? result = default;
+            if (func != null)
+            {
+                var ptr = Marshal.AllocHGlobal(Marshal.SizeOf<T>());
+                func.DynamicInvoke(pname, ptr);
+                result = Marshal.PtrToStructure<T>(ptr);
+                Marshal.FreeHGlobal(ptr);
+            }
+            return result;
+        }
+
+        private delegate void glGetBooleani_v(GLParameter target, uint index, IntPtr data);
+        private delegate void glGetIntegeri_v(GLParameter target, uint index, IntPtr data);
+        private delegate void glGetFloati_v(GLParameter target, uint index, IntPtr data);
+        private delegate void glGetDoublei_v(GLParameter target, uint index, IntPtr data);
+        private delegate void glGetInteger64i_v(GLParameter target, uint index, IntPtr data);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T">[bool,int,long,float,double]</typeparam>
+        /// <param name="pname"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        public static T? Get<T>(GLParameter pname, uint index) where T : struct
+        {
+            Delegate? func = null;
+            if (typeof(T) == typeof(int)) { func = GetProcAddress<glGetIntegeri_v>(); }
+            if (typeof(T) == typeof(bool)) { func = GetProcAddress<glGetBooleani_v>(); }
+            if (typeof(T) == typeof(float)) { func = GetProcAddress<glGetFloati_v>(); }
+            if (typeof(T) == typeof(double)) { func = GetProcAddress<glGetDoublei_v>(); }
+            if (typeof(T) == typeof(long)) { func = GetProcAddress<glGetInteger64i_v>(); }
+            T? result = default;
+            if (func != null)
+            {
+                var ptr = Marshal.AllocHGlobal(Marshal.SizeOf<T>());
+                func.DynamicInvoke(pname, index, ptr);
+                result = Marshal.PtrToStructure<T>(ptr);
+                Marshal.FreeHGlobal(ptr);
+            }
+            return result;
+        }
 
         private delegate void glViewport(int x, int y, int width, int height);
         public static void Viewport(int x, int y, int width, int height)
@@ -236,22 +297,22 @@ namespace Thriving.OpenGL
             func?.Invoke(array.Length, array);
         }
 
-        private delegate void glBindVertexArray(uint[] array);
-        public static void BindVertexArray(uint[] array)
+        private delegate void glBindVertexArray(uint array);
+        public static void BindVertexArray(uint array)
         {
             var func = GetProcAddress<glBindVertexArray>();
             func?.Invoke(array);
         }
 
-        private delegate void glBindBuffer(BufferType bufferType, uint buffer);
-        public static void BindBuffer(BufferType bufferType, uint buffer)
+        private delegate void glBindBuffer(BufferTarget bufferType, uint buffer);
+        public static void BindBuffer(BufferTarget bufferType, uint buffer)
         {
             var func = GetProcAddress<glBindBuffer>();
             func?.Invoke(bufferType, buffer);
         }
 
-        private delegate void glBufferData(BufferType bufferType, long size, void* data, BufferUsage usage);
-        public static void BufferData<T>(BufferType bufferType, T[] data, BufferUsage usage) where T : struct
+        private delegate void glBufferData(BufferTarget bufferType, long size, void* data, BufferUsage usage);
+        public static void BufferData<T>(BufferTarget bufferType, T[] data, BufferUsage usage) where T : struct
         {
             var func = GetProcAddress<glBufferData>();
             if (func == null) return;
@@ -260,6 +321,61 @@ namespace Thriving.OpenGL
             {
                 func.Invoke(bufferType, size, ptr, usage);
             }
+        }
+
+        private delegate void glBufferSubData(BufferTarget bufferType, long offset, long size, void* data);
+        public static void BufferSubData<T>(BufferTarget bufferType, long offset, T[] data) where T : struct
+        {
+            var func = GetProcAddress<glBufferSubData>();
+            if (func == null) return;
+            long size = data.Length * Marshal.SizeOf<T>();
+            fixed (T* ptr = data)
+            {
+                func.Invoke(bufferType, offset, size, ptr);
+            }
+        }
+
+        private delegate void glNamedBufferSubData(BufferTarget bufferType, long offset, long size, void* data);
+        public static void NamedBufferSubData<T>(BufferTarget bufferType, long offset, T[] data) where T : struct
+        {
+            var func = GetProcAddress<glNamedBufferSubData>();
+            if (func == null) return;
+            long size = data.Length * Marshal.SizeOf<T>();
+            fixed (T* ptr = data)
+            {
+                func.Invoke(bufferType, offset, size, ptr);
+            }
+        }
+
+
+        private delegate IntPtr glMapBuffer(BufferTarget target, BufferAccess access);
+        public static IntPtr MapBuffer(BufferTarget target, BufferAccess access)
+        {
+            var func = GetProcAddress<glMapBuffer>();
+            if (func != null) return func.Invoke(target, access);
+            return IntPtr.Zero;
+        }
+
+        private delegate bool glUnmapBuffer(BufferTarget target);
+        public static bool UnmapBuffer(BufferTarget target)
+        {
+            var func = GetProcAddress<glUnmapBuffer>();
+            return func?.Invoke(target) == true;
+        }
+
+        private delegate IntPtr glMapNamedBuffer(uint buffer, BufferAccess access);
+        public static IntPtr MapNamedBuffer(uint buffer, BufferAccess access)
+        {
+            var func = GetProcAddress<glMapNamedBuffer>();
+            if (func != null) return func.Invoke(buffer, access);
+            return IntPtr.Zero;
+        }
+
+        private delegate bool glUnmapNamedBuffer(uint buffer);
+        public static bool UnmapNamedBuffer(uint buffer)
+        {
+            var func = GetProcAddress<glUnmapNamedBuffer>();
+            return func?.Invoke(buffer) == true;
         }
 
         private delegate void glVertexAttribPointer(int index, int size, DataType type, bool normalized, int stride, int offset);
@@ -574,15 +690,14 @@ namespace Thriving.OpenGL
             return result;
         }
 
-        private delegate void glGetShaderInfoLog(uint shader, int bufSize, ref int length, char[] infoLog);
+        private delegate void glGetShaderInfoLog(uint shader, int bufSize, out int length, [MarshalAs(UnmanagedType.LPStr)] StringBuilder infoLog);
         public static string GetShaderInfoLog(uint shader)
         {
             var bufSize = GetShaderiv(shader, ShaderInfo.GL_INFO_LOG_LENGTH);
             var func = GetProcAddress<glGetShaderInfoLog>();
-            var result = new char[bufSize];
-            int length = 0;
-            func?.Invoke(shader, bufSize, ref length, result);
-            return length > 0 ? new string(result) : string.Empty;
+            var builder = new StringBuilder();
+            func?.Invoke(shader, bufSize, out int length, builder);
+            return builder.ToString();
         }
 
         private delegate void glGetProgramiv(uint program, ProgramInfo pName, out int param);
@@ -594,15 +709,14 @@ namespace Thriving.OpenGL
             return result;
         }
 
-        private delegate void glGetProgramInfoLog(uint program, int bufSize, ref int length, char[] infoLog);
+        private delegate void glGetProgramInfoLog(uint program, int bufSize, out int length,[MarshalAs(UnmanagedType.LPStr)] StringBuilder infoLog);
         public static string GetProgramInfoLog(uint program)
         {
             var bufSize = GetProgramiv(program, ProgramInfo.GL_INFO_LOG_LENGTH);
             var func = GetProcAddress<glGetProgramInfoLog>();
-            int length = 0;
-            var result = new char[bufSize];
-            func?.Invoke(program, bufSize, ref length, result);
-            return length > 0 ? new string(result) : string.Empty;
+            var builder = new StringBuilder();
+            func?.Invoke(program, bufSize, out int length, builder);
+            return builder.ToString();
         }
 
         private delegate int glGetUniformLocation(uint program, string param);
@@ -965,6 +1079,14 @@ namespace Thriving.OpenGL
         }
 
 
+        private delegate void glDepthFunc(DepthFunc func);
+        public static void DepthFunc(DepthFunc mode)
+        {
+            var func = GetProcAddress<glDepthFunc>();
+            func?.Invoke( mode);
+        }
+
+
         [DllImport("opengl32.dll", EntryPoint = "wglCreateContext")]
         private static extern IntPtr wglCreateContext(IntPtr hDC);
 
@@ -1001,4 +1123,23 @@ namespace Thriving.OpenGL
         GL_FRONT_AND_BACK = 0x0408,
     }
 
+    public enum BufferAccess
+    {
+        GL_READ_ONLY= 0x88B8,
+        GL_WRITE_ONLY= 0x88B9,
+        GL_READ_WRITE= 0x88BA,
+    }
+
+
+    public enum DepthFunc
+    {
+        GL_NEVER=0x0200,
+        GL_LESS=0x0201,
+        GL_EQUAL= 0x0202,
+        GL_LEQUAL= 0x0203,
+        GL_GREATER= 0x0204,
+        GL_NOTEQUAL= 0x0205,
+        GL_GEQUAL= 0x0206,
+        GL_ALWAYS=0x0207,
+    }
 }

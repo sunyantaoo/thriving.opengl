@@ -1,4 +1,5 @@
 ﻿using Thriving.OpenCV;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Thriving.OpenGL
 {
@@ -96,19 +97,19 @@ namespace Thriving.OpenGL
 
         private const int GL_TEXTURE_SWIZZLE_RGBA = 0x8E46;
 
-        private readonly uint[] _textures;
+        private readonly uint _texId;
         private readonly TextureTarget _target;
         public Texture(TextureTarget target)
         {
-            _textures = GL.GenTextures(1);
+            _texId = GL.GenTextures(1)[0];
             _target = target;
         }
 
-        public uint Id { get => _textures[0]; }
+        public uint Id { get => _texId; }
 
         ~Texture()
         {
-             GL.DeleteTextures(1, _textures);
+            GL.DeleteTextures(1, [_texId]);
         }
 
         public void Bind()
@@ -158,7 +159,7 @@ namespace Thriving.OpenGL
             GL.TexParameteri(_target, GL_TEXTURE_MIN_FILTER, (int)filterType);
         }
 
-        public void SetBorderColor(float red,float green,float blue,float alpha)
+        public void SetBorderColor(float red, float green, float blue, float alpha)
         {
             var array = new float[4] { red, green, blue, alpha };
             GL.TexParameterfv(_target, GL_TEXTURE_BORDER_COLOR, array);
@@ -170,11 +171,44 @@ namespace Thriving.OpenGL
             CVImage image = CVImage.Read(imagePath);
             if (image.Width % 2 != 0)
             {
-               // image.Resize(new CVSize() { });
+                // image.Resize(new CVSize() { });
             }
             GL.BindTexture(_target, Id);
             GL.TexImage2D(_target, 0, TextureFormat.GL_RGB, image.Width, image.Height, TextureFormat.GL_BGR, DataType.GL_UNSIGNED_BYTE, image.Data);
             GL.GenerateMipmap(_target);
+        }
+
+        public void BindCubeMap(string right, string left, string top, string bottom, string front, string back)
+        {
+            if (!File.Exists(right)) throw new FileNotFoundException(string.Empty, right);
+            if (!File.Exists(left)) throw new FileNotFoundException(string.Empty, left);
+            if (!File.Exists(top)) throw new FileNotFoundException(string.Empty, top);
+            if (!File.Exists(bottom)) throw new FileNotFoundException(string.Empty, bottom);
+            if (!File.Exists(front)) throw new FileNotFoundException(string.Empty, front);
+            if (!File.Exists(back)) throw new FileNotFoundException(string.Empty, back);
+
+            CVImage rightImg = CVImage.Read(right);
+            CVImage leftImg = CVImage.Read(left);
+            CVImage topImg = CVImage.Read(top);
+            CVImage bottomImg = CVImage.Read(bottom);
+            CVImage frontImg = CVImage.Read(front);
+            CVImage backImg = CVImage.Read(back);
+
+            GL.BindTexture(_target, Id);
+            GL.TexImage2D(TextureTarget.GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, TextureFormat.GL_RGB, rightImg.Width, rightImg.Height, TextureFormat.GL_BGR, DataType.GL_UNSIGNED_BYTE, rightImg.Data);
+            GL.TexImage2D(TextureTarget.GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, TextureFormat.GL_RGB, leftImg.Width, leftImg.Height, TextureFormat.GL_BGR, DataType.GL_UNSIGNED_BYTE, leftImg.Data);
+            GL.TexImage2D(TextureTarget.GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, TextureFormat.GL_RGB, topImg.Width, topImg.Height, TextureFormat.GL_BGR, DataType.GL_UNSIGNED_BYTE, topImg.Data);
+            GL.TexImage2D(TextureTarget.GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, TextureFormat.GL_RGB, bottomImg.Width, bottomImg.Height, TextureFormat.GL_BGR, DataType.GL_UNSIGNED_BYTE, bottomImg.Data);
+            GL.TexImage2D(TextureTarget.GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, TextureFormat.GL_RGB, frontImg.Width, frontImg.Height, TextureFormat.GL_BGR, DataType.GL_UNSIGNED_BYTE, frontImg.Data);
+            GL.TexImage2D(TextureTarget.GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, TextureFormat.GL_RGB, backImg.Width, backImg.Height, TextureFormat.GL_BGR, DataType.GL_UNSIGNED_BYTE, backImg.Data);
+
+
+           GL.TexParameteri(_target, GL_TEXTURE_MIN_FILTER, (int)FilterType.GL_LINEAR);
+           GL.TexParameteri(_target, GL_TEXTURE_MAG_FILTER, (int)FilterType.GL_LINEAR);
+           GL.TexParameteri(_target, GL_TEXTURE_WRAP_S, (int)WrapType. GL_CLAMP_TO_EDGE);
+           GL.TexParameteri(_target, GL_TEXTURE_WRAP_T, (int)WrapType.GL_CLAMP_TO_EDGE);
+           GL.TexParameteri(_target, GL_TEXTURE_WRAP_R, (int)WrapType.GL_CLAMP_TO_EDGE);
+            // GL.GenerateMipmap(_target);
         }
     }
 

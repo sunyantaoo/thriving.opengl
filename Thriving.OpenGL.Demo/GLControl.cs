@@ -4,6 +4,7 @@ using Thriving.Geometry;
 using Thriving.Win32Tools;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Input;
 
 namespace Thriving.OpenGL.Demo
 {
@@ -22,7 +23,7 @@ namespace Thriving.OpenGL.Demo
         /// GL Render Context
         /// </summary>
         private IntPtr _hglrc;
-      
+
         public bool PolygonMode
         {
             get { return (bool)GetValue(PolygonModeProperty); }
@@ -32,38 +33,29 @@ namespace Thriving.OpenGL.Demo
             DependencyProperty.Register("PolygonMode", typeof(bool), typeof(GLControl), new PropertyMetadata(false, OnPropertyChanged));
 
 
-        public string VertexShaderSource
-        {
-            get { return (string)GetValue(VertexShaderSourceProperty); }
-            set { SetValue(VertexShaderSourceProperty, value); }
-        }
-        public static readonly DependencyProperty VertexShaderSourceProperty =
-            DependencyProperty.Register("VertexShaderSource", typeof(string), typeof(GLControl), new PropertyMetadata(vertexShaderSource,OnPropertyChanged));
 
-        public string FragmentShaderSource
+        public bool ColorMode
         {
-            get { return (string)GetValue(FragmentShaderSourceProperty); }
-            set { SetValue(FragmentShaderSourceProperty, value); }
+            get { return (bool)GetValue(ColorModeProperty); }
+            set { SetValue(ColorModeProperty, value); }
         }
-        public static readonly DependencyProperty FragmentShaderSourceProperty =
-            DependencyProperty.Register("FragmentShaderSource", typeof(string), typeof(GLControl), new PropertyMetadata(fragmentShaderSource,OnPropertyChanged));
 
-        public string GeometryShaderSource
-        {
-            get { return (string)GetValue(GeometryShaderSourceProperty); }
-            set { SetValue(GeometryShaderSourceProperty, value); }
-        }
-        public static readonly DependencyProperty GeometryShaderSourceProperty =
-            DependencyProperty.Register("GeometryShaderSource", typeof(string), typeof(GLControl), new PropertyMetadata(string.Empty, OnPropertyChanged));
+        // Using a DependencyProperty as the backing store for ColorMode.  This enables animation, styling, binding, etc...
+        public static readonly DependencyProperty ColorModeProperty =
+            DependencyProperty.Register("ColorMode", typeof(bool), typeof(GLControl), new PropertyMetadata(false, OnPropertyChanged));
+
+
+
 
         private static void OnPropertyChanged(DependencyObject obj, DependencyPropertyChangedEventArgs e)
         {
             if (obj is GLControl ctl)
             {
-                if (e.Property == VertexShaderSourceProperty || e.Property == FragmentShaderSourceProperty)
+                if (e.Property == ColorModeProperty)
                 {
-                    ctl.ComplierShader();
+                    ctl.RefreshShader();
                 }
+
                 ctl.Refresh();
             }
         }
@@ -130,37 +122,55 @@ namespace Thriving.OpenGL.Demo
             WindowHelper.SendMessage(_hwnd, WindowMessage.WM_PAINT, IntPtr.Zero, IntPtr.Zero);
         }
 
-        private void ComplierShader()
+        private void RefreshShader()
         {
-            if (_shader == null) return;
-            if (!string.IsNullOrEmpty(VertexShaderSource)) _shader.Complie(VertexShaderSource, ShaderType.GL_VERTEX_SHADER);
-            if (!string.IsNullOrEmpty(GeometryShaderSource)) _shader.Complie(GeometryShaderSource, ShaderType.GL_GEOMETRY_SHADER);
-            if (!string.IsNullOrEmpty(FragmentShaderSource)) _shader.Complie(fragmentShaderSource, ShaderType.GL_FRAGMENT_SHADER);
-            _shader.Link();
-            _shader.Use();
+            var shader = new Shader();
+            if (ColorMode)
+            {
+                var colorSource = "#version 440 core\r\n" +
+                    "in vec2 TexCoord;\r\n" +
+                    "in vec3 TexColor;\r\n" +
+                    "void main()\r\n" +
+                    "{\r\n" +
+                    "gl_FragColor = vec4(TexColor,0.6);\r\n" +
+                    "}";
+
+                shader.Complie(vertexShaderSource, ShaderType.GL_VERTEX_SHADER);
+                shader.Complie(colorSource, ShaderType.GL_FRAGMENT_SHADER);
+                shader.Link();
+            }
+            else
+            {
+                shader.Complie(vertexShaderSource, ShaderType.GL_VERTEX_SHADER);
+                shader.Complie(fragmentShaderSource, ShaderType.GL_FRAGMENT_SHADER);
+                shader.Link();
+            }
+            _shader = shader;
         }
 
-        private const string vertexShaderSource = "#version 330 core\r\n" +
+        private const string vertexShaderSource = "#version 440 core\r\n" +
            "layout (location = 0) in vec3 aPos;\r\n" +
            "layout (location = 1) in vec3 aNormal;\r\n" +
            "layout (location = 2) in vec2 aTexCoord;\r\n" +
            "layout (location = 3) in vec3 aColor;\r\n" +
            "out vec2 TexCoord;\r\n" +
+           "out vec3 TexColor;\r\n" +
            "uniform mat4 model;\r\n" +
            "uniform mat4 projection;\r\n" +
            "void main()\r\n" +
            "{\r\n" +
            "gl_Position = projection * model * vec4(aPos, 1.0f);\r\n" +
-           "TexCoord = vec2(aTexCoord.x, aTexCoord.y);\r\n" +
+           "TexCoord = aTexCoord;\r\n" +
+           "TexColor = aColor;\r\n" +
            "}";
-        private const string fragmentShaderSource = "#version 330 core\r\n" +
-            "out vec4 FragColor;\r\n" +
+        private const string fragmentShaderSource = "#version 440 core\r\n" +
             "in vec2 TexCoord;\r\n" +
+            "in vec3 TexColor;\r\n" +
             "uniform sampler2D texture1;\r\n" +
-             "uniform sampler2D texture2;\r\n" +
+            "uniform sampler2D texture2;\r\n" +
             "void main()\r\n" +
             "{\r\n" +
-            "FragColor = mix(texture(texture1, TexCoord), texture(texture2, TexCoord), 0.2);\r\n" +
+            "gl_FragColor = mix(texture(texture1, TexCoord), texture(texture2, TexCoord), 0.2);\r\n" +
             "}";
 
         protected Shader _shader;
@@ -168,7 +178,11 @@ namespace Thriving.OpenGL.Demo
         protected Texture _texture1;
         protected Texture _texture2;
 
-        protected GeometryEntity _entity;
+        protected Shader _skyboxShader;
+        protected Texture _skyboxTexture;
+        protected uint _skyboxVAO;
+
+        protected ICollection<GeometryEntity> _entities;
 
         private bool _firstMouse = true;
         private short _lastX;
@@ -209,79 +223,110 @@ namespace Thriving.OpenGL.Demo
                 //    ZFar = 100,
                 //};
 
-                _camera = new Thriving.OpenGL.PerspectiveCamera()
-                {
-                    Position = new Thriving.Geometry.Point3D(0, 0, 5),
-                    LookAt = Thriving.Geometry.Vector3D.BasisZ.Negate(),
-                    Up = Thriving.Geometry.Vector3D.BasisY,
-                    ZNear = 0.1,
-                    ZFar = 100,
-                    fov = 45,
-                };
+                _camera = new Thriving.OpenGL.PerspectiveCamera(
+
+                   new Thriving.Geometry.Point3D(0, 0, 5),
+                    Thriving.Geometry.Vector3D.BasisZ.Negate(),
+                    Thriving.Geometry.Vector3D.BasisY,
+                    45,
+                    3 / 4);
 
                 _shader = new Shader();
                 _shader.Complie(vertexShaderSource, ShaderType.GL_VERTEX_SHADER);
                 _shader.Complie(fragmentShaderSource, ShaderType.GL_FRAGMENT_SHADER);
                 _shader.Link();
-                _shader.Use();
+
+                _skyboxShader = new Shader();
+                _skyboxShader.Complie("#version 440 core\r\n" +
+                    "layout (location = 0) in vec3 aPos;\r\n\r\n" +
+                    "out vec3 TexCoords;\r\n\r\n" +
+                    "uniform mat4 projection;\r\n" +
+                    "void main()\r\n{\r\n    TexCoords = aPos;\r\n    " +
+                    "gl_Position =projection * vec4(aPos, 1.0);\r\n }", ShaderType.GL_VERTEX_SHADER);
+                _skyboxShader.Complie("#version 440 core\r\n" +
+                    "in vec3 TexCoords;\r\n\r\n" +
+                    "uniform samplerCube skybox;\r\n\r\n" +
+                    "void main()\r\n{    \r\n    gl_FragColor = texture(skybox, TexCoords);\r\n}", ShaderType.GL_FRAGMENT_SHADER);
+                _skyboxShader.Link();
 
                 var vertices = new Vertex[]{
 
  // 底面
-                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D( 0.0f, 0.0f)},
-                      new Vertex(){Position =new Point3D( 0.5f, -0.5f, -0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                      new Vertex(){Position =new Point3D( 0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D( 0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 0.0f)},
+                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D( 0.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D( 0.5f, -0.5f, -0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D( 0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D( 0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
 // 顶面
-                      new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f)},
-                      new Vertex(){Position =new Point3D( 0.5f, -0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                      new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(0.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f)},
+                      new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D( 0.5f, -0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
 // 左侧面
-                      new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D( 0.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D( 0.0f, 1.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f)},
-                      new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
+                      new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                      new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
 // 右侧面
-                       new Vertex(){Position =new Point3D(0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D(0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                       new Vertex(){Position =new Point3D(0.5f, -0.5f, -0.5f),UV=new Vector2D( 0.0f, 1.0f)},
-                       new Vertex(){Position =new Point3D(0.5f, -0.5f, -0.5f),UV=new Vector2D( 0.0f, 1.0f)},
-                       new Vertex(){Position =new Point3D(0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D(0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
+                       new Vertex(){Position =new Point3D(0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
 // 近面
-                       new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f)},
-                       new Vertex(){Position =new Point3D( 0.5f, -0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                       new Vertex(){Position =new Point3D( 0.5f, -0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D( 0.5f, -0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f)},
+                       new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D( 0.5f, -0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D( 0.5f, -0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D( 0.5f, -0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(-0.5f, -0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(-0.5f, -0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
 // 远面
-                       new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f)},
-                       new Vertex(){Position =new Point3D( 0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f)},
-                       new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f)},
-                       new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f)}
+                       new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D( 0.5f,  0.5f, -0.5f),UV=new Vector2D(1.0f, 1.0f),Color=new Vector3D(0.7,0.2,0.0)},
+                       new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D( 0.5f,  0.5f,  0.5f),UV=new Vector2D(1.0f, 0.0f),Color=new Vector3D(1,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(-0.5f,  0.5f,  0.5f),UV=new Vector2D(0.0f, 0.0f),Color=new Vector3D(0.6,0.2,0.8)},
+                       new Vertex(){Position =new Point3D(-0.5f,  0.5f, -0.5f),UV=new Vector2D(0.0f, 1.0f),Color=new Vector3D(1,0.2,0.3)}
                 };
                 var indices = new uint[] {
                         0, 1, 3,
                         1, 2, 3
                     };
 
+
+
                 var geo = new GeometryObject();
                 geo.SetupVertexBuffer(vertices);
                 geo.SetupIndexBuffer(indices);
+                //    geo.EnableVertexAttribute();
 
                 var material = new BasicMaterial();
 
-                _entity = new GeometryEntity(geo, material);
+                Point3D[] cubePositions = {
+                    new Point3D(0.0f, 0.0f, 0.0f),
+                    new Point3D(2.0f, 5.0f, -15.0f),
+                    new Point3D(-1.5f, -2.2f, -2.5f),
+                    new Point3D(-3.8f, -2.0f, -12.3f),
+                    new Point3D(2.4f, -0.4f, -3.5f),
+                    new Point3D(-1.7f, 3.0f, -7.5f),
+                    new Point3D(1.3f, -2.0f, -2.5f),
+                    new Point3D(1.5f, 2.0f, -2.5f),
+                    new Point3D(1.5f, 0.2f, -1.5f),
+                    new Point3D(-1.3f, 1.0f, -1.5f)
+                };
+                _entities = new List<GeometryEntity>();
+                foreach (var vertex in cubePositions)
+                {
+                    var entity = new GeometryEntity(geo, material);
+                    entity.Position = (vertex);
+                    _entities.Add(entity);
+                }
 
                 _texture1 = new Texture(TextureTarget.GL_TEXTURE_2D);
                 _texture1.BindImage2D(@"C:\Users\Master\Desktop\PixPin_2024-07-26_23-41-47.jpg");
@@ -289,11 +334,84 @@ namespace Thriving.OpenGL.Demo
                 _texture2 = new Texture(TextureTarget.GL_TEXTURE_2D);
                 _texture2.BindImage2D(@"C:\Users\Master\Desktop\PixPin_2024-07-26_23-42-03.jpg");
 
+                _shader.Use();
                 var location = GL.GetUniformLocation(_shader.Id, "texture1");
                 GL.Uniform1i(location, 0);
 
                 var location4 = GL.GetUniformLocation(_shader.Id, "texture2");
                 GL.Uniform1i(location4, 1);
+
+
+                var skybox = new float[]
+                {
+      -1.0f,  1.0f, -1.0f,
+      -1.0f, -1.0f, -1.0f,
+       1.0f, -1.0f, -1.0f,
+       1.0f, -1.0f, -1.0f,
+       1.0f,  1.0f, -1.0f,
+      -1.0f,  1.0f, -1.0f,
+
+         -1.0f, -1.0f,  1.0f,
+         -1.0f, -1.0f, -1.0f,
+         -1.0f,  1.0f, -1.0f,
+         -1.0f,  1.0f, -1.0f,
+         -1.0f,  1.0f,  1.0f,
+         -1.0f, -1.0f,  1.0f,
+
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+
+       -1.0f, -1.0f,  1.0f,
+       -1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f,
+       -1.0f, -1.0f,  1.0f,
+
+         -1.0f,  1.0f, -1.0f ,
+          1.0f,  1.0f, -1.0f,
+          1.0f,  1.0f,  1.0f,
+          1.0f,  1.0f,  1.0f,
+         -1.0f,  1.0f,  1.0f,
+         -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f
+
+                };
+
+
+                _skyboxVAO = GL.GenVertexArrays(1)[0];
+                var skyboxVBO = GL.GenBuffers(1);
+                GL.BindVertexArray(_skyboxVAO);
+
+                GL.BindBuffer(BufferTarget.GL_ARRAY_BUFFER, skyboxVBO[0]);
+                GL.BufferData(BufferTarget.GL_ARRAY_BUFFER, skybox, BufferUsage.GL_STATIC_DRAW);
+
+                /////顶点着色器position属性 layout (location = 0)
+                GL.EnableVertexAttribArray(0);
+                GL.VertexAttribPointer(0, 3, DataType.GL_FLOAT, false, 3 * Marshal.SizeOf<float>(), 0);
+
+                _skyboxTexture = new Texture(TextureTarget.GL_TEXTURE_CUBE_MAP);
+                _skyboxTexture.BindCubeMap(
+                @"C:\Users\Master\Desktop\LearnC\LearnOpenGL\resources/textures/skybox/right.jpg",
+              @"C:\Users\Master\Desktop\LearnC\LearnOpenGL\resources/textures/skybox/left.jpg",
+               @"C:\Users\Master\Desktop\LearnC\LearnOpenGL\resources/textures/skybox/top.jpg",
+              @"C:\Users\Master\Desktop\LearnC\LearnOpenGL\resources/textures/skybox/bottom.jpg",
+              @"C:\Users\Master\Desktop\LearnC\LearnOpenGL\resources/textures/skybox/front.jpg",
+               @"C:\Users\Master\Desktop\LearnC\LearnOpenGL\resources/textures/skybox/back.jpg");
+
+                _skyboxShader.Use();
+                var location5 = GL.GetUniformLocation(_skyboxShader.Id, "skybox");
+                GL.Uniform1i(location5, 0);
             }
 
             if ((WindowMessage?)msg == WindowMessage.WM_PAINT)
@@ -318,17 +436,41 @@ namespace Thriving.OpenGL.Demo
                 {
                     GL.Enable(Capability.GL_DEPTH_TEST);
                 }
-           
+
                 GL.ClearColor(0.2f, 0.3f, 0.3f, 1.0f);
                 GL.Clear(BufferBitType.GL_COLOR_BUFFER_BIT | BufferBitType.GL_DEPTH_BUFFER_BIT);
+
+                _shader.Use();
 
                 GL.ActiveTexture(TextureLayer.GL_TEXTURE0);
                 _texture1.Bind();
                 GL.ActiveTexture(TextureLayer.GL_TEXTURE1);
                 _texture2.Bind();
 
-                _entity.Rotate(Vector3D.BasisY, (float)(DateTime.Now.Millisecond * Math.PI / 999));
-                _entity.Draw(_shader, _camera);
+                foreach (var cube in _entities)
+                {
+                    cube.Rotate(Vector3D.BasisZ, (float)(10 * Math.PI / 180));
+                    cube.Draw(_shader, _camera, false);
+                }
+
+                if (PolygonMode) GL.PolygonMode(Thriving.OpenGL.PolygonMode.GL_FILL);
+
+                GL.DepthFunc(DepthFunc.GL_LEQUAL);
+                _skyboxShader.Use();
+
+                var location = GL.GetUniformLocation(_skyboxShader.Id, "projection");
+                if (location >= 0)
+                {
+                    var tArray = _camera.GetTestMatrix();
+                    GL.UniformMatrix4fv(location, 1, false, tArray);
+                }
+
+                GL.BindVertexArray(_skyboxVAO);
+                GL.ActiveTexture(TextureLayer.GL_TEXTURE0);
+                _skyboxTexture.Bind();
+
+                GL.DrawArrays(DrawMode.GL_TRIANGLES, 0, 36);
+                GL.DepthFunc(DepthFunc.GL_LESS);
 
                 GL.SwapBuffers(_hdc);
             }
@@ -360,34 +502,32 @@ namespace Thriving.OpenGL.Demo
                 var key = (VirtualKeyCode?)wParam;
                 if (key == VirtualKeyCode.VK_DOWN)
                 {
-                    _camera.Position = _camera.Position.Add(0.1 * _camera.Up);
+                    _camera.Translate(0.1 * _camera.Up);
                 }
                 if (key == VirtualKeyCode.VK_UP)
                 {
-                    _camera.Position = _camera.Position.Subtract(0.1 * _camera.Up);
+                    _camera.Translate(-0.1 * _camera.Up);
                 }
                 if (key == VirtualKeyCode.VK_LEFT)
                 {
-                    _camera.Position = _camera.Position.Subtract(0.1 * _camera.Right);
+                    _camera.Translate(-0.1 * _camera.Right);
                 }
                 if (key == VirtualKeyCode.VK_RIGHT)
                 {
-                    _camera.Position = _camera.Position.Add(0.1 * _camera.Right);
+                    _camera.Translate(0.1 * _camera.Right);
                 }
                 Refresh();
             }
 
             if (msg == WindowMessage.WM_MOUSEWHEEL)
             {
-                // 120 的倍数
                 var offset = Win32Helper.High16Bits(wParam);
                 if (_camera is PerspectiveCamera pers)
                 {
-                    _camera.Position = _camera.Position.Add((offset / 120) * _camera.LookAt);
+                    _camera.Translate((offset / Mouse.MouseWheelDeltaForOneLine) * _camera.LookAt);
                 }
                 Refresh();
             }
-
 
             if (msg == WindowMessage.WM_MOUSEMOVE)
             {
@@ -425,6 +565,20 @@ namespace Thriving.OpenGL.Demo
                     _firstMouse = true;
                 }
             }
+
+            if (msg == WindowMessage.WM_LBUTTONDOWN)
+            {
+                var yPos = Win32Helper.High16Bits(lParam);
+                var xPos = Win32Helper.Low16Bits(lParam);
+
+                // 裁剪空间坐标
+                var x = 2 * (xPos / this.ActualWidth) - 1;
+                var y = 1 - 2 * (yPos / this.ActualHeight);
+
+                // 空间坐标
+                var p = _camera.GetRay(x, y);
+            }
+
             return WindowHelper.DefWindowProc(hwnd, msg, wParam, lParam);
         }
     }

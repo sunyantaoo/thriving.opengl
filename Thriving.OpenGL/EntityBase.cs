@@ -35,6 +35,12 @@ namespace Thriving.OpenGL
             }
         }
 
+        public Point3D Position
+        {
+            get => _transform.Origin;
+            set { _transform = new Transform3D(value, _transform.BasisX, _transform.BasisY, _transform.BasisZ); }
+        }
+
         /// <summary>
         /// 移动
         /// </summary>
@@ -72,7 +78,7 @@ namespace Thriving.OpenGL
 
     public class GeometryEntity : EntityBase
     {
-        private readonly GeometryObject _geometry;
+        private readonly  GeometryObject _geometry;
         private readonly BasicMaterial _material;
         public GeometryEntity(GeometryObject geometry, BasicMaterial material)
         {
@@ -80,7 +86,7 @@ namespace Thriving.OpenGL
             _material = material;
         }
 
-        public void Draw(Shader shader, CameraBase camera)
+        public void Draw(Shader shader, CameraBase camera,bool normalized)
         {
             shader.Use();
             // 更新顶点着色器
@@ -88,7 +94,7 @@ namespace Thriving.OpenGL
             // 更新片段着色器
             shader.UpdateFragmentShader(_material);
 
-            _geometry.Draw();
+            _geometry.Draw(normalized);
         }
 
     }

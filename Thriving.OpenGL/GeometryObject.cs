@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using Thriving.Geometry;
 
 namespace Thriving.OpenGL
@@ -83,41 +84,44 @@ namespace Thriving.OpenGL
         /// <summary>
         /// 顶点数组
         /// </summary>
-        private readonly uint[] _vaos;
+        private readonly uint _vaos;
+        private readonly List<uint> _buffers;
         public GeometryObject()
         {
-            _vaos = GL.GenVertexArrays(1);
+            var arrs = GL.GenVertexArrays(1);
+            _vaos=arrs[0];
+            _buffers = new List<uint>();
         }
 
         ~GeometryObject()
         {
-            GL.DeleteVertexArrays(_vaos);
-            if (_vbos != null) GL.DeleteBuffers(_vbos);
-            if (_ebos != null) GL.DeleteBuffers(_ebos);
+            GL.DeleteVertexArrays([_vaos]);
+            if (_buffers.Count > 0)
+            {
+                GL.DeleteBuffers(_buffers.ToArray());
+            }
         }
 
-        /// <summary>
-        /// 顶点缓存
-        /// </summary>
-        private uint[]? _vbos;
-        /// <summary>
-        /// 索引缓存
-        /// </summary>
-        private uint[]? _ebos;
 
-        public uint Id { get => _vaos[0]; }
+        public uint Id { get => _vaos; }
+
+        /// <summary>
+        /// 包围盒
+        /// </summary>
+        public BBox3D BoundingBox { get; }
 
         /// <summary>
         /// 将顶点数据写入GPU
         /// </summary>
         /// <param name="vertices"></param>
-        public unsafe void SetupVertexBuffer(Vertex[] vertices)
+        public void SetupVertexBuffer(Vertex[] vertices)
         {
             GL.BindVertexArray(_vaos);
             {
-                _vbos = GL.GenBuffers(1);
-                GL.BindBuffer(BufferType.GL_ARRAY_BUFFER, _vbos[0]);
-                GL.BufferData(BufferType.GL_ARRAY_BUFFER, vertices, BufferUsage.GL_STATIC_DRAW);
+                var _vbos = GL.GenBuffers(1);
+                GL.BindBuffer(BufferTarget.GL_ARRAY_BUFFER, _vbos[0]);
+                GL.BufferData(BufferTarget.GL_ARRAY_BUFFER, vertices, BufferUsage.GL_STATIC_DRAW);
+                _buffers.AddRange(_vbos);
 
                 //顶点着色器position属性 layout (location = 0)
                 GL.VertexAttribPointer(0, 3, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), 0);
@@ -135,26 +139,27 @@ namespace Thriving.OpenGL
                 GL.VertexAttribPointer(3, 3, DataType.GL_DOUBLE, false, Marshal.SizeOf<Vertex>(), (Marshal.OffsetOf<Vertex>(nameof(Vertex._color)).ToInt32()));
                 GL.EnableVertexAttribArray(3);
             }
-            GL.BindVertexArray(Array.Empty<uint>());
+            GL.BindVertexArray(0);
         }
 
         /// <summary>
         /// 将索引数据写入GPU
         /// </summary>
         /// <param name="indices"></param>
-        public unsafe void SetupIndexBuffer(uint[] indices)
+        public void SetupIndexBuffer(uint[] indices)
         {
             GL.BindVertexArray(_vaos);
             {
-                _ebos = GL.GenBuffers(1);
-                GL.BindBuffer(BufferType.GL_ELEMENT_ARRAY_BUFFER, _ebos[0]);
-                GL.BufferData(BufferType.GL_ELEMENT_ARRAY_BUFFER, indices, BufferUsage.GL_STATIC_DRAW);
+                var _ebos = GL.GenBuffers(1);
+                GL.BindBuffer(BufferTarget.GL_ELEMENT_ARRAY_BUFFER, _ebos[0]);
+                GL.BufferData(BufferTarget.GL_ELEMENT_ARRAY_BUFFER, indices, BufferUsage.GL_STATIC_DRAW);
+                _buffers.AddRange(_ebos);
             }
-            GL.BindVertexArray(Array.Empty<uint>());
+            GL.BindVertexArray(0);
         }
 
 
-        internal void Draw()
+        internal virtual void Draw(bool normalized=false)
         {
             GL.BindVertexArray(_vaos);
             {
@@ -162,17 +167,11 @@ namespace Thriving.OpenGL
                 GL.DrawArrays(DrawMode.GL_TRIANGLES, 0, 36);
                 //GL.DrawElements(DrawMode.GL_TRIANGLES, 6, indices);
             }
-            GL.BindVertexArray(Array.Empty<uint>());
+            GL.BindVertexArray(0);
         }
 
     }
 
-    /// <summary>
-    /// 四面体，四个顶点，四个三角面，
-    /// </summary>
-    public class Tetrahedron : GeometryObject
-    {
 
-    }
 
 }

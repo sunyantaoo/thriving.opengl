@@ -1,6 +1,6 @@
 ﻿namespace Thriving.OpenGL
 {
-    public enum BufferType
+    public enum BufferTarget
     {
         GL_ARRAY_BUFFER = 0x8892,
         GL_ATOMIC_COUNTER_BUFFER = 0x92C0,

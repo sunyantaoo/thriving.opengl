@@ -27,6 +27,7 @@
                 Margin="5"
                 Content="着色模式" />
         </StackPanel>
-        <local:GLControl x:Name="gl" PolygonMode="{Binding ElementName=polygon_mode, Path=IsChecked}" />
+        <local:GLControl x:Name="gl" PolygonMode="{Binding ElementName=polygon_mode, Path=IsChecked}"
+                         ColorMode="{Binding ElementName=color_mode,Path=IsChecked}"/>
     </DockPanel>
 </Window>

@@ -55,7 +55,7 @@
         }
 
 
-        internal void UpdateVertexShader(EntityBase entity,CameraBase camera)
+        public void UpdateVertexShader(EntityBase entity,CameraBase camera)
         {
             var location = GL.GetUniformLocation(_program, "model");
             if (location >= 0)
@@ -72,7 +72,7 @@
             }
         }
 
-        internal void UpdateFragmentShader(BasicMaterial material)
+        public void UpdateFragmentShader(BasicMaterial material)
         {
 
         }
